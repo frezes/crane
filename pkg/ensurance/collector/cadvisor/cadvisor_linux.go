@@ -76,7 +76,7 @@ func NewCadvisorManager(cgroupDriver string) Manager {
 	maxHousekeepingInterval := 10 * time.Second
 	memCache := cmemory.New(10*time.Minute, nil)
 	sysfs := csysfs.NewRealSysFs()
-	maxHousekeepingConfig := cmanager.HouskeepingConfig{Interval: &maxHousekeepingInterval, AllowDynamic: &allowDynamic}
+	maxHousekeepingConfig := cmanager.HousekeepingConfig{Interval: &maxHousekeepingInterval, AllowDynamic: &allowDynamic}
 
 	m, err := cmanager.New(memCache, sysfs, maxHousekeepingConfig, includedMetrics, http.DefaultClient, []string{"/" + utils.CgroupKubePods}, nil /* containerEnvMetadataWhiteList */, "" /* perfEventsFile */, time.Duration(0) /*resctrlInterval*/)
 	if err != nil {
