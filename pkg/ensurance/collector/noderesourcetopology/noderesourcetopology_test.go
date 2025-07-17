@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 func Test_parseReservedSystemCPUs(t *testing.T) {
@@ -23,7 +23,7 @@ func Test_parseReservedSystemCPUs(t *testing.T) {
 			args: args{
 				kubeletConfig: newKubeletConfig(nil, nil, "2-3"),
 			},
-			want:    cpuset.NewCPUSet(2, 3),
+			want:    cpuset.New(2, 3),
 			wantErr: false,
 		},
 	}

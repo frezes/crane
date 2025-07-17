@@ -21,8 +21,8 @@ import (
 	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletcpumanager "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
+	"k8s.io/utils/cpuset"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	craneclientset "github.com/gocrane/api/pkg/generated/clientset/versioned"

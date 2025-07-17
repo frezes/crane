@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
@@ -122,7 +123,7 @@ func main() {
 		klog.Exit(err, "Unable to create discover client")
 	}
 
-	restMapper, err := apiutil.NewDynamicRESTMapper(config)
+	restMapper, err := apiutil.NewDynamicRESTMapper(config, http.DefaultClient)
 	if err != nil {
 		klog.Exit(err, "Unable to create rest mapper")
 	}
@@ -149,7 +150,7 @@ func main() {
 	cmd.WithExternalMetrics(externalMetricProvider)
 
 	klog.Infof(cmd.Message)
-	if err := cmd.Run(ctx.Done()); err != nil {
+	if err := cmd.Run(ctx); err != nil {
 		klog.ErrorS(err, "Failed to run metrics adapter")
 		os.Exit(1)
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	autoscalingapi "github.com/gocrane/api/autoscaling/v1alpha1"
 
@@ -18,37 +19,37 @@ type ValidationAdmission struct {
 }
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (p *ValidationAdmission) Default(ctx context.Context, req runtime.Object) error {
-	return nil
+func (p *ValidationAdmission) Default(ctx context.Context, req runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (p *ValidationAdmission) ValidateCreate(ctx context.Context, req runtime.Object) error {
+func (p *ValidationAdmission) ValidateCreate(ctx context.Context, req runtime.Object) (admission.Warnings, error) {
 	ehpa, ok := req.(*autoscalingapi.EffectiveHorizontalPodAutoscaler)
 	if ok {
 		if len(ehpa.Spec.Crons) > 0 {
 			err := ValidateCronSpecs(ehpa)
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (p *ValidationAdmission) ValidateUpdate(ctx context.Context, old, new runtime.Object) error {
+func (p *ValidationAdmission) ValidateUpdate(ctx context.Context, old, new runtime.Object) (admission.Warnings, error) {
 	ehpa, ok := new.(*autoscalingapi.EffectiveHorizontalPodAutoscaler)
 	if ok {
 		if len(ehpa.Spec.Crons) > 0 {
 			err := ValidateCronSpecs(ehpa)
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (p *ValidationAdmission) ValidateDelete(ctx context.Context, req runtime.Object) error {
-	return nil
+func (p *ValidationAdmission) ValidateDelete(ctx context.Context, req runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 func ValidateCronSpecs(ehpa *autoscalingapi.EffectiveHorizontalPodAutoscaler) error {

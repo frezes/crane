@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/credentials/insecure"
 	criapis "k8s.io/cri-api/pkg/apis"
-	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	pb "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criremote "k8s.io/cri-client/pkg"
+	"k8s.io/cri-client/pkg/util"
 	"k8s.io/klog/v2"
-	criremote "k8s.io/kubernetes/pkg/kubelet/cri/remote"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	gprcconnection "github.com/gocrane/crane/pkg/ensurance/grpc"
 )
@@ -74,7 +76,7 @@ func GetCRIRuntimeService(runtimeEndpoint string) (criapis.RuntimeService, error
 			continue
 		}
 		klog.V(2).Infof("Runtime connect using endpoint: %v", endpoint)
-		containerRuntime, err := criremote.NewRemoteRuntimeService(endpoint, 3*time.Second)
+		containerRuntime, err := criremote.NewRemoteRuntimeService(endpoint, 3*time.Second, nil, nil)
 		if err != nil {
 			klog.Fatalf("Failed to connect to remote runtime service: %v", err)
 		}
@@ -93,8 +95,24 @@ func dialRemoteRuntime(endpoint string, connectionTimeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	// use block mode to wait for connection
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer), grpc.WithBlock())
+	var dialOpts []grpc.DialOption
+	dialOpts = append(dialOpts,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithAuthority("localhost"),
+		grpc.WithContextDialer(dialer),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*16)))
+
+	connParams := grpc.ConnectParams{
+		Backoff: backoff.DefaultConfig,
+	}
+	connParams.MinConnectTimeout = 5 * time.Second
+	connParams.Backoff.BaseDelay = 100 * time.Millisecond
+	connParams.Backoff.MaxDelay = 3 * time.Second
+	dialOpts = append(dialOpts,
+		grpc.WithConnectParams(connParams),
+	)
+
+	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		klog.ErrorS(err, "Connect remote runtime failed", "address", addr)
 		return err

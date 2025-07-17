@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	ensuranceapi "github.com/gocrane/api/ensurance/v1alpha1"
 	"github.com/gocrane/crane/pkg/ensurance/collector"
@@ -27,17 +28,17 @@ type ActionValidationAdmission struct {
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (p *NodeQOSValidationAdmission) ValidateCreate(ctx context.Context, req runtime.Object) error {
+func (p *NodeQOSValidationAdmission) ValidateCreate(ctx context.Context, req runtime.Object) (admission.Warnings, error) {
 
 	nodeQOS, ok := req.(*ensuranceapi.NodeQOS)
 	if !ok {
-		return fmt.Errorf("req can not convert to NodeQOS")
+		return nil, fmt.Errorf("req can not convert to NodeQOS")
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&nodeQOS.ObjectMeta, false, genericvalidation.NameIsDNS1035Label, field.NewPath("metadata"))
 
 	if nodeQOS.Spec.Selector != nil {
-		allErrs = append(allErrs, metavalidation.ValidateLabelSelector(nodeQOS.Spec.Selector, field.NewPath("spec").Child("selector"))...)
+		allErrs = append(allErrs, metavalidation.ValidateLabelSelector(nodeQOS.Spec.Selector, metavalidation.LabelSelectorValidationOptions{}, field.NewPath("spec").Child("selector"))...)
 	}
 
 	allErrs = append(allErrs, validateNodeQualityProbe(nodeQOS.Spec.NodeQualityProbe, field.NewPath("nodeQualityProbe"))...)
@@ -49,10 +50,10 @@ func (p *NodeQOSValidationAdmission) ValidateCreate(ctx context.Context, req run
 	allErrs = append(allErrs, validateRules(nodeQOS.Spec.Rules, field.NewPath("objectiveEnsurances"), httpGetEnable)...)
 
 	if len(allErrs) != 0 {
-		return allErrs.ToAggregate()
+		return nil, allErrs.ToAggregate()
 	}
 
-	return nil
+	return nil, nil
 }
 
 func validateNodeQualityProbe(nodeProbe ensuranceapi.NodeQualityProbe, fldPath *field.Path) field.ErrorList {
@@ -170,7 +171,7 @@ func validateMetricRule(rule *ensuranceapi.MetricRule, fldPath *field.Path, http
 	}
 
 	if rule.Selector != nil {
-		allErrs = append(allErrs, metavalidation.ValidateLabelSelector(rule.Selector, fldPath.Child("selector"))...)
+		allErrs = append(allErrs, metavalidation.ValidateLabelSelector(rule.Selector, metavalidation.LabelSelectorValidationOptions{}, fldPath.Child("selector"))...)
 	}
 
 	if rule.Value.Cmp(resource.Quantity{}) <= 0 {
@@ -181,47 +182,47 @@ func validateMetricRule(rule *ensuranceapi.MetricRule, fldPath *field.Path, http
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (p *NodeQOSValidationAdmission) ValidateUpdate(ctx context.Context, old, new runtime.Object) error {
+func (p *NodeQOSValidationAdmission) ValidateUpdate(ctx context.Context, old, new runtime.Object) (admission.Warnings, error) {
 
 	oldNodeQOS, ok := old.(*ensuranceapi.NodeQOS)
 	if !ok {
-		return fmt.Errorf("old can not convert to NodeQOS")
+		return nil, fmt.Errorf("old can not convert to NodeQOS")
 	}
 
 	newNodeQOS, ok := old.(*ensuranceapi.NodeQOS)
 	if !ok {
-		return fmt.Errorf("new can not convert to NodeQOS")
+		return nil, fmt.Errorf("new can not convert to NodeQOS")
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&newNodeQOS.ObjectMeta, &oldNodeQOS.ObjectMeta, field.NewPath("metadata"))
 
 	if len(allErrs) != 0 {
-		return allErrs.ToAggregate()
+		return nil, allErrs.ToAggregate()
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (p *NodeQOSValidationAdmission) ValidateDelete(ctx context.Context, req runtime.Object) error {
-	return nil
+func (p *NodeQOSValidationAdmission) ValidateDelete(ctx context.Context, req runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (p *ActionValidationAdmission) ValidateCreate(ctx context.Context, req runtime.Object) error {
+func (p *ActionValidationAdmission) ValidateCreate(ctx context.Context, req runtime.Object) (admission.Warnings, error) {
 	action, ok := req.(*ensuranceapi.AvoidanceAction)
 	if !ok {
-		return fmt.Errorf("req can not convert to AvoidanceAction")
+		return nil, fmt.Errorf("req can not convert to AvoidanceAction")
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&action.ObjectMeta, false, genericvalidation.NameIsDNSLabel, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateAvoidanceActionSpec(action.Spec, field.NewPath("spec"))...)
 
 	if len(allErrs) != 0 {
-		return allErrs.ToAggregate()
+		return nil, allErrs.ToAggregate()
 	}
 
-	return nil
+	return nil, nil
 }
 
 func validateAvoidanceActionSpec(spec ensuranceapi.AvoidanceActionSpec, fldPath *field.Path) field.ErrorList {
@@ -274,29 +275,29 @@ func validateEvictionAction(eviction *ensuranceapi.EvictionAction, fldPath *fiel
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (p *ActionValidationAdmission) ValidateUpdate(ctx context.Context, old, new runtime.Object) error {
+func (p *ActionValidationAdmission) ValidateUpdate(ctx context.Context, old, new runtime.Object) (admission.Warnings, error) {
 	oldNodeQOS, ok := old.(*ensuranceapi.AvoidanceAction)
 	if !ok {
-		return fmt.Errorf("old can not convert to AvoidanceAction")
+		return nil, fmt.Errorf("old can not convert to AvoidanceAction")
 	}
 
 	newNodeQOS, ok := old.(*ensuranceapi.AvoidanceAction)
 	if !ok {
-		return fmt.Errorf("new can not convert to AvoidanceAction")
+		return nil, fmt.Errorf("new can not convert to AvoidanceAction")
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&newNodeQOS.ObjectMeta, &oldNodeQOS.ObjectMeta, field.NewPath("metadata"))
 
 	if len(allErrs) != 0 {
-		return allErrs.ToAggregate()
+		return nil, allErrs.ToAggregate()
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (p *ActionValidationAdmission) ValidateDelete(ctx context.Context, req runtime.Object) error {
-	return nil
+func (p *ActionValidationAdmission) ValidateDelete(ctx context.Context, req runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 // Copied from k8s.io/kubernetes/pkg/apis/core/validation/validation.go

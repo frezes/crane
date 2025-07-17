@@ -3,16 +3,13 @@ package ehpa
 import (
 	"context"
 
-	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/gocrane/crane/pkg/metrics"
 )
@@ -43,15 +40,9 @@ func (c *HPAObserverController) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (c *HPAObserverController) SetupWithManager(mgr ctrl.Manager) error {
-	// Create a new controller
-	controller, err := controller.New("hpa-observer-controller", mgr, controller.Options{
-		Reconciler: c})
-	if err != nil {
-		return err
-	}
 
-	// Watch for changes to HPA
-	return controller.Watch(&source.Kind{Type: &autoscalingv2.HorizontalPodAutoscaler{}}, &hpaEventHandler{
-		enqueueHandler: handler.EnqueueRequestForObject{},
-	})
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&autoscalingv2.HorizontalPodAutoscaler{}).
+		Complete(c)
+
 }

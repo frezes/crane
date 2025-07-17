@@ -1,6 +1,7 @@
 package cpumanager
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync"
@@ -17,13 +18,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	criapis "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	cpumanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/utils/cpuset"
 
 	topologyinformer "github.com/gocrane/api/pkg/generated/informers/externalversions/topology/v1alpha1"
 	topologylisters "github.com/gocrane/api/pkg/generated/listers/topology/v1alpha1"
@@ -47,7 +48,7 @@ const (
 )
 
 var DefaultExclusiveCPUSet = func() cpuset.CPUSet {
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 
 type CPUManager interface {
@@ -114,7 +115,7 @@ func NewCPUManager(
 	}
 	klog.InfoS("Detected CPU topology", "topology", topo)
 
-	initialContainers := buildContainerMapFromRuntime(containerRuntime)
+	initialContainers := buildContainerMapFromRuntime(context.Background(), containerRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build map of initial containers from runtime: %v", err)
 	}
@@ -268,11 +269,14 @@ func (cm *cpuManager) GetSharedCPUs() cpuset.CPUSet {
 	return cm.policy.GetSharedCPUs(cm.state)
 }
 
-func (cm *cpuManager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {
+func (cm *cpuManager) updateContainerCPUSet(ctx context.Context, containerID string, cpus cpuset.CPUSet) error {
 	return cm.containerRuntime.UpdateContainerResources(
+		ctx,
 		containerID,
-		&runtimeapi.LinuxContainerResources{
-			CpusetCpus: cpus.String(),
+		&runtimeapi.ContainerResources{
+			Linux: &runtimeapi.LinuxContainerResources{
+				CpusetCpus: cpus.String(),
+			},
 		})
 }
 
@@ -496,7 +500,7 @@ func (cm *cpuManager) reconcileState() (success []reconciledContainer, failure [
 			}
 			if !cset.Equals(lcset) || !updated {
 				klog.V(4).InfoS("ReconcileState: updating container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
-				err = cm.updateContainerCPUSet(containerID, cset)
+				err = cm.updateContainerCPUSet(context.Background(), containerID, cset)
 				if err != nil {
 					klog.ErrorS(err, "ReconcileState: failed to update container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
 					failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
@@ -566,15 +570,15 @@ func findRunningContainerStatus(status *corev1.PodStatus, container string) (str
 	return containerID, cstatus, nil
 }
 
-func buildContainerMapFromRuntime(runtimeService criapis.RuntimeService) containermap.ContainerMap {
+func buildContainerMapFromRuntime(ctx context.Context, runtimeService criapis.RuntimeService) containermap.ContainerMap {
 	podSandboxMap := make(map[string]string)
-	podSandboxList, _ := runtimeService.ListPodSandbox(nil)
+	podSandboxList, _ := runtimeService.ListPodSandbox(ctx, nil)
 	for _, p := range podSandboxList {
 		podSandboxMap[p.Id] = p.Metadata.Uid
 	}
 
 	containerMap := containermap.NewContainerMap()
-	containerList, _ := runtimeService.ListContainers(nil)
+	containerList, _ := runtimeService.ListContainers(ctx, nil)
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
 			klog.InfoS("no PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
